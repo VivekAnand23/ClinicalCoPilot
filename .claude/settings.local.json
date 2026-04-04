@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/vivekanand/Projects/ClinicalCoPilot/PRD/**)",
+      "Bash(unzip -p ClinicalCoPilot_PRD.docx word/document.xml)",
+      "Bash(python3:*)",
+      "Bash(unzip -q -p ClinicalCoPilot_PRD.docx word/document.xml)",
+      "Bash(grep -v '^$')",
+      "Bash(claude doctor:*)",
+      "Bash(npm install:*)",
+      "Bash(npx vite:*)",
+      "Bash(node:*)",
+      "Bash(lsof:*)",
+      "Bash(ps:*)",
+      "Bash(curl:*)",
+      "Bash(npm list:*)"
+    ]
+  }
+}
