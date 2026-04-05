@@ -17,14 +17,14 @@
     "recharts": "^2.13.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.47.0",
+    "@testing-library/jest-dom": "^6.4.8",
+    "@testing-library/react": "^16.0.0",
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.20",
+    "jsdom": "^24.1.1",
     "postcss": "^8.4.41",
     "tailwindcss": "^3.4.10",
-    "vitest": "^2.1.0",
-    "@testing-library/react": "^16.0.0",
-    "@testing-library/jest-dom": "^6.4.8",
-    "jsdom": "^24.1.1",
-    "@playwright/test": "^1.47.0"
+    "vitest": "^4.1.2"
   }
 }
