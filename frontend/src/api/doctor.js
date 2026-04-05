@@ -11,4 +11,5 @@ export const doctorAPI = {
     }),
   updateNote: (noteId, updates) => api.patch(`/doctor/notes/${noteId}`, updates),
   markReportViewed: (reportId) => api.post(`/doctor/reports/${reportId}/view`, {}),
+  getPatientTrends: (patientId) => api.get(`/doctor/patients/${patientId}/trends`),
 };

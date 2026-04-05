@@ -10,6 +10,7 @@ export default function PatientDetail() {
   const { patientId } = useParams();
   const [reports, setReports] = useState([]);
   const [selectedReport, setSelectedReport] = useState(null);
+  const [trendBiomarkers, setTrendBiomarkers] = useState([]);
   const [noteText, setNoteText] = useState('');
   const [flagOverride, setFlagOverride] = useState('');
   const [loading, setLoading] = useState(true);
@@ -17,12 +18,16 @@ export default function PatientDetail() {
   const [noteSuccess, setNoteSuccess] = useState(false);
 
   useEffect(() => {
-    doctorAPI.getPatientReports(patientId)
-      .then((data) => {
-        setReports(data);
-        if (data.length > 0) {
-          setSelectedReport(data[0]);
-          doctorAPI.markReportViewed(data[0].id).catch(() => {});
+    Promise.all([
+      doctorAPI.getPatientReports(patientId),
+      doctorAPI.getPatientTrends(patientId).catch(() => []),
+    ])
+      .then(([reportsData, trendsData]) => {
+        setReports(reportsData);
+        setTrendBiomarkers(trendsData);
+        if (reportsData.length > 0) {
+          setSelectedReport(reportsData[0]);
+          doctorAPI.markReportViewed(reportsData[0].id).catch(() => {});
         }
       })
       .catch((err) => setError(err.message))
@@ -38,7 +43,6 @@ export default function PatientDetail() {
       setNoteSuccess(true);
       setNoteText('');
       setFlagOverride('');
-      // Refresh reports
       const updated = await doctorAPI.getPatientReports(patientId);
       setReports(updated);
       setSelectedReport(updated.find((r) => r.id === selectedReport.id) || updated[0]);
@@ -46,23 +50,6 @@ export default function PatientDetail() {
       setError(err.message);
     }
   };
-
-  // Build trend data for a specific biomarker across reports
-  const getBiomarkerTrend = (biomarkerName) => {
-    return reports
-      .filter((r) => r.status === 'complete' && r.lab_values)
-      .map((r) => {
-        const lv = r.lab_values.find((v) => v.biomarker_name === biomarkerName);
-        return lv ? { date: r.report_date || r.created_at, value: lv.value } : null;
-      })
-      .filter(Boolean)
-      .reverse();
-  };
-
-  // Get unique biomarkers across all reports
-  const allBiomarkers = [...new Set(
-    reports.flatMap((r) => (r.lab_values || []).map((lv) => lv.biomarker_name))
-  )];
 
   if (loading) {
     return (
@@ -131,30 +118,13 @@ export default function PatientDetail() {
               </div>
             </section>
 
-            {/* Trend Charts (if multiple reports) */}
-            {reports.length > 1 && allBiomarkers.length > 0 && (
-              <section className="mb-8">
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">Trends</h3>
-                <div className="grid sm:grid-cols-2 gap-4">
-                  {allBiomarkers.slice(0, 6).map((name) => {
-                    const trend = getBiomarkerTrend(name);
-                    if (trend.length < 2) return null;
-                    const lv = selectedReport.lab_values?.find((v) => v.biomarker_name === name);
-                    return (
-                      <div key={name} className="bg-white rounded-xl shadow-sm p-4 border">
-                        <TrendChart
-                          data={trend}
-                          biomarkerName={name}
-                          unit={lv?.unit}
-                          referenceMin={lv?.reference_min}
-                          referenceMax={lv?.reference_max}
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
-            )}
+            {/* Biomarker Trend Chart */}
+            <section className="mb-8">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Biomarker Trends</h3>
+              <div className="bg-white rounded-xl shadow-sm border p-5">
+                <TrendChart biomarkers={trendBiomarkers} showConcernSummary={true} />
+              </div>
+            </section>
 
             {/* Doctor Notes */}
             <section className="mb-8">

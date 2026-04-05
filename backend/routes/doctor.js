@@ -135,6 +135,97 @@ router.get('/patients/:patientId/reports', async (req, res) => {
   }
 });
 
+// GET /api/doctor/patients/:patientId/trends
+router.get('/patients/:patientId/trends', async (req, res) => {
+  try {
+    const { patientId } = req.params;
+
+    // Verify link exists
+    const { data: link, error: linkError } = await supabaseAdmin
+      .from('doctor_patients')
+      .select('id, is_active, removed_at')
+      .eq('doctor_id', req.user.id)
+      .eq('patient_id', patientId)
+      .single();
+
+    if (linkError || !link) {
+      return res.status(403).json({ success: false, error: 'Access denied', code: 'FORBIDDEN' });
+    }
+
+    let query = supabaseAdmin
+      .from('lab_values')
+      .select('biomarker_name, value, unit, reference_min, reference_max, status, reports!inner(user_id, report_date, created_at, id)')
+      .eq('reports.user_id', patientId)
+      .not('value', 'is', null)
+      .order('created_at', { ascending: true });
+
+    // For inactive links, only show data up to removal date
+    if (!link.is_active && link.removed_at) {
+      query = query.lte('reports.created_at', link.removed_at);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    // Fetch trend risk flags for this patient to mark concerned biomarkers
+    const { data: trendFlags } = await supabaseAdmin
+      .from('risk_flags')
+      .select('disease_category, reports!inner(user_id)')
+      .eq('reports.user_id', patientId)
+      .ilike('disease_category', '%(Trend)%');
+
+    const trendFlagCategories = new Set((trendFlags || []).map((f) => f.disease_category));
+
+    // Group by biomarker
+    const grouped = {};
+    for (const row of data || []) {
+      const name = row.biomarker_name;
+      if (!grouped[name]) {
+        grouped[name] = {
+          biomarker_name: name,
+          unit: row.unit,
+          reference_min: row.reference_min,
+          reference_max: row.reference_max,
+          has_concern: false,
+          data_points: [],
+        };
+      }
+      grouped[name].data_points.push({
+        value: parseFloat(row.value),
+        status: row.status,
+        date: row.reports.report_date || row.reports.created_at,
+        report_id: row.reports.id,
+      });
+      // Mark concern if any point is abnormal or borderline
+      if (row.status === 'abnormal' || row.status === 'borderline') {
+        grouped[name].has_concern = true;
+      }
+    }
+
+    // Also mark concern if a trend flag exists for this biomarker's category
+    for (const name of Object.keys(grouped)) {
+      for (const category of trendFlagCategories) {
+        if (category.toLowerCase().includes(name.toLowerCase())) {
+          grouped[name].has_concern = true;
+        }
+      }
+    }
+
+    // Sort data points by date
+    for (const name of Object.keys(grouped)) {
+      grouped[name].data_points.sort((a, b) => new Date(a.date) - new Date(b.date));
+    }
+
+    // Sort: concerned biomarkers first
+    const result = Object.values(grouped).sort((a, b) => (b.has_concern ? 1 : 0) - (a.has_concern ? 1 : 0));
+
+    res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    console.error('Patient trends error:', err.message);
+    res.status(500).json({ success: false, error: 'Failed to fetch trend data', code: 'INTERNAL_ERROR' });
+  }
+});
+
 // POST /api/doctor/reports/:reportId/view — mark a report as viewed
 router.post('/reports/:reportId/view', async (req, res) => {
   try {
