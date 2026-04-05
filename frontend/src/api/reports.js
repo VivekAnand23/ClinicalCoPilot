@@ -12,4 +12,7 @@ export const reportsAPI = {
   get: (id) => api.get(`/reports/${id}`),
   delete: (id) => api.delete(`/reports/${id}`),
   share: (id, doctorEmail) => api.post(`/reports/${id}/share`, { doctor_email: doctorEmail }),
+  trends: () => api.get('/reports/trends'),
+  getDoctors: () => api.get('/reports/doctors'),
+  removeDoctor: (doctorId) => api.delete(`/reports/doctors/${doctorId}`),
 };

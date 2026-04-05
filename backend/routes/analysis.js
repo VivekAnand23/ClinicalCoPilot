@@ -4,6 +4,7 @@ const { authenticate } = require('../middleware/authenticate');
 const { extractText } = require('../services/extractText');
 const { analyzeBloodWork } = require('../services/claudeAnalysis');
 const { parseAnalysisResponse } = require('../services/parseAnalysis');
+const { detectTrendRisks } = require('../services/trendAnalysis');
 
 const router = express.Router();
 
@@ -146,6 +147,31 @@ router.post('/:reportId/run', authenticate, async (req, res) => {
       if (riskError) throw riskError;
     }
 
+    // Detect trends across historical reports and add trend-based risk flags
+    let trendFlags = [];
+    try {
+      trendFlags = await detectTrendRisks(req.user.id, reportId, analysis.lab_values);
+
+      if (trendFlags.length > 0) {
+        const trendFlagRows = trendFlags.map((tf) => ({
+          report_id: reportId,
+          disease_category: tf.disease_category,
+          risk_level: tf.risk_level,
+          explanation: tf.explanation,
+          ai_confidence: tf.ai_confidence,
+        }));
+
+        const { error: trendError } = await supabaseAdmin
+          .from('risk_flags')
+          .insert(trendFlagRows);
+
+        if (trendError) throw trendError;
+      }
+    } catch (trendErr) {
+      // Non-fatal: log and continue without trend flags
+      console.error('Trend analysis error:', trendErr.message);
+    }
+
     // Update report status to complete
     await supabaseAdmin
       .from('reports')
@@ -157,7 +183,7 @@ router.post('/:reportId/run', authenticate, async (req, res) => {
       data: {
         status: 'complete',
         lab_values: analysis.lab_values,
-        risk_flags: analysis.risk_flags,
+        risk_flags: [...analysis.risk_flags, ...trendFlags],
         extraction_notes: analysis.extraction_notes,
       },
     });

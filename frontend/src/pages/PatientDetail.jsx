@@ -20,7 +20,10 @@ export default function PatientDetail() {
     doctorAPI.getPatientReports(patientId)
       .then((data) => {
         setReports(data);
-        if (data.length > 0) setSelectedReport(data[0]);
+        if (data.length > 0) {
+          setSelectedReport(data[0]);
+          doctorAPI.markReportViewed(data[0].id).catch(() => {});
+        }
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -87,7 +90,10 @@ export default function PatientDetail() {
           {reports.map((r) => (
             <button
               key={r.id}
-              onClick={() => setSelectedReport(r)}
+              onClick={() => {
+                setSelectedReport(r);
+                doctorAPI.markReportViewed(r.id).catch(() => {});
+              }}
               className={`text-sm px-3 py-1.5 rounded-lg border transition ${
                 selectedReport?.id === r.id ? 'bg-blue-600 text-white border-blue-600' : 'bg-white border-gray-300 hover:bg-gray-50'
               }`}

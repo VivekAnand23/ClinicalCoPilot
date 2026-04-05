@@ -57,7 +57,18 @@ CREATE TABLE public.doctor_patients (
   doctor_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   patient_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   linked_at TIMESTAMPTZ DEFAULT NOW(),
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  removed_at TIMESTAMPTZ,
   UNIQUE (doctor_id, patient_id)
+);
+
+-- Tracks which reports a doctor has opened/viewed
+CREATE TABLE public.doctor_report_views (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  doctor_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  report_id UUID NOT NULL REFERENCES public.reports(id) ON DELETE CASCADE,
+  viewed_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (doctor_id, report_id)
 );
 
 -- Doctor notes and flag overrides on reports
@@ -141,6 +152,10 @@ CREATE POLICY "doctor_patients_visible" ON public.doctor_patients
 CREATE POLICY "patients_can_link_doctor" ON public.doctor_patients
   FOR INSERT WITH CHECK (auth.uid() = patient_id);
 
+-- Doctor-patient links: patients can deactivate their own links
+CREATE POLICY "patients_can_update_link" ON public.doctor_patients
+  FOR UPDATE USING (auth.uid() = patient_id);
+
 -- Doctor notes: doctors can manage their own notes
 CREATE POLICY "doctors_own_notes" ON public.doctor_notes
   FOR ALL USING (auth.uid() = doctor_id);
@@ -153,6 +168,19 @@ CREATE POLICY "patients_see_notes" ON public.doctor_notes
       WHERE reports.id = doctor_notes.report_id AND reports.user_id = auth.uid()
     )
   );
+
+-- Doctor report views RLS
+ALTER TABLE public.doctor_report_views ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "doctors_own_views" ON public.doctor_report_views
+  FOR ALL USING (auth.uid() = doctor_id);
+
+-- =============================================
+-- MIGRATION (run if tables already exist):
+-- ALTER TABLE public.doctor_patients ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;
+-- ALTER TABLE public.doctor_patients ADD COLUMN IF NOT EXISTS removed_at TIMESTAMPTZ;
+-- CREATE TABLE IF NOT EXISTS public.doctor_report_views ( ... as above ... );
+-- =============================================
 
 -- Create storage bucket for reports
 -- Run this in Supabase dashboard or via API:

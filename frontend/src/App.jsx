@@ -12,6 +12,7 @@ import ShareReport from './pages/ShareReport';
 import DoctorDashboard from './pages/DoctorDashboard';
 import PatientDetail from './pages/PatientDetail';
 import Settings from './pages/Settings';
+import TrendsPage from './pages/TrendsPage';
 
 function ProtectedRoute({ children, requiredRole }) {
   const { user, loading } = useAuth();
@@ -69,6 +70,7 @@ export default function App() {
       <Route path="/doctor/dashboard" element={<ProtectedRoute requiredRole="doctor"><DoctorDashboard /></ProtectedRoute>} />
       <Route path="/doctor/patient/:patientId" element={<ProtectedRoute requiredRole="doctor"><PatientDetail /></ProtectedRoute>} />
 
+      <Route path="/trends" element={<ProtectedRoute><TrendsPage /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
 
       <Route path="*" element={<Navigate to="/" replace />} />

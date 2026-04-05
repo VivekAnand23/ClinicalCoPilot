@@ -42,6 +42,12 @@ export default function Results() {
       <nav className="bg-white border-b px-6 py-4 flex items-center justify-between">
         <Link to="/dashboard" className="text-lg font-bold text-blue-700">ClinicalCoPilot</Link>
         <div className="flex gap-3">
+          <Link to="/trends" className="text-sm text-blue-600 hover:underline flex items-center gap-1">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+            </svg>
+            View Trends
+          </Link>
           <Link to={`/share/${reportId}`} className="text-sm text-blue-600 hover:underline">Share with Doctor</Link>
           <Link to="/dashboard" className="text-sm text-gray-500 hover:text-gray-700">Back</Link>
         </div>

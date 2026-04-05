@@ -123,6 +123,102 @@ router.post('/upload', authenticate, handleUpload, async (req, res) => {
   }
 });
 
+// GET /api/reports/doctors — list all doctors linked to the current patient
+router.get('/doctors', authenticate, async (req, res) => {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('doctor_patients')
+      .select('id, linked_at, is_active, removed_at, profiles:doctor_id (id, email, full_name, doctor_credentials)')
+      .eq('patient_id', req.user.id)
+      .order('linked_at', { ascending: false });
+
+    if (error) throw error;
+
+    res.status(200).json({ success: true, data: data || [] });
+  } catch (err) {
+    console.error('List doctors error:', err.message);
+    res.status(500).json({ success: false, error: 'Failed to fetch doctors', code: 'INTERNAL_ERROR' });
+  }
+});
+
+// DELETE /api/reports/doctors/:doctorId — remove a doctor's access (soft deactivate)
+router.delete('/doctors/:doctorId', authenticate, async (req, res) => {
+  try {
+    const { data: link, error: fetchError } = await supabaseAdmin
+      .from('doctor_patients')
+      .select('id')
+      .eq('patient_id', req.user.id)
+      .eq('doctor_id', req.params.doctorId)
+      .eq('is_active', true)
+      .single();
+
+    if (fetchError || !link) {
+      return res.status(404).json({ success: false, error: 'Doctor link not found', code: 'NOT_FOUND' });
+    }
+
+    const { error: updateError } = await supabaseAdmin
+      .from('doctor_patients')
+      .update({ is_active: false, removed_at: new Date().toISOString() })
+      .eq('id', link.id);
+
+    if (updateError) throw updateError;
+
+    res.status(200).json({ success: true, data: { message: 'Doctor access removed' } });
+  } catch (err) {
+    console.error('Remove doctor error:', err.message);
+    res.status(500).json({ success: false, error: 'Failed to remove doctor', code: 'INTERNAL_ERROR' });
+  }
+});
+
+// GET /api/reports/trends
+router.get('/trends', authenticate, async (req, res) => {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('lab_values')
+      .select('biomarker_name, value, unit, reference_min, reference_max, status, reports!inner(user_id, report_date, created_at, id)')
+      .eq('reports.user_id', req.user.id)
+      .not('value', 'is', null)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+
+    // Group by biomarker
+    const grouped = {};
+    for (const row of data || []) {
+      const name = row.biomarker_name;
+      if (!grouped[name]) {
+        grouped[name] = {
+          biomarker_name: name,
+          unit: row.unit,
+          reference_min: row.reference_min,
+          reference_max: row.reference_max,
+          data_points: [],
+        };
+      }
+      grouped[name].data_points.push({
+        value: parseFloat(row.value),
+        status: row.status,
+        date: row.reports.report_date || row.reports.created_at,
+        report_id: row.reports.id,
+      });
+    }
+
+    // Sort data points by date within each biomarker
+    for (const name of Object.keys(grouped)) {
+      grouped[name].data_points.sort((a, b) => new Date(a.date) - new Date(b.date));
+    }
+
+    res.status(200).json({ success: true, data: Object.values(grouped) });
+  } catch (err) {
+    console.error('Trends error:', err.message);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch trend data',
+      code: 'INTERNAL_ERROR',
+    });
+  }
+});
+
 // GET /api/reports
 router.get('/', authenticate, async (req, res) => {
   try {
